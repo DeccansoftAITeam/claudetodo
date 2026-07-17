@@ -3,3 +3,6 @@ node_modules
 __pycache__/
 dist/
 .playwright-mcp
+backend/todos.db
+backend/todos.db-wal
+backend/todos.db-shm

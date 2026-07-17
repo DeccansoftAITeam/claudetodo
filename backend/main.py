@@ -1,14 +1,43 @@
+import sqlite3
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="ClaudeTodo API", version="1.0")
+DB_PATH = Path(__file__).parent / "todos.db"
 
-# In-memory store for v1 (no database). Keyed by todo id.
-# Newest-first ordering is derived when listing, so insertion order is fine.
-_todos: dict[str, dict] = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create the table on startup. WAL mode keeps writes crash-safe.
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS todos (
+            id TEXT PRIMARY KEY,
+            text TEXT NOT NULL,
+            completed INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+    yield
+
+
+app = FastAPI(title="ClaudeTodo API", version="1.0", lifespan=lifespan)
+
+
+def _get_conn() -> sqlite3.Connection:
+    # check_same_thread=False: uvicorn may serve requests across threads.
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 class TodoBase(BaseModel):
@@ -34,11 +63,11 @@ class Todo(BaseModel):
     created_at: str
 
 
-def _to_todo(row: dict) -> Todo:
+def _to_todo(row: sqlite3.Row) -> Todo:
     return Todo(
         id=row["id"],
         text=row["text"],
-        completed=row["completed"],
+        completed=bool(row["completed"]),
         created_at=row["created_at"],
     )
 
@@ -51,8 +80,12 @@ def health():
 @app.get("/api/todos", response_model=list[Todo])
 def list_todos():
     # Newest first: sort by created_at descending.
-    ordered = sorted(_todos.values(), key=lambda r: r["created_at"], reverse=True)
-    return [_to_todo(r) for r in ordered]
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT id, text, completed, created_at FROM todos ORDER BY created_at DESC"
+    ).fetchall()
+    conn.close()
+    return [_to_todo(r) for r in rows]
 
 
 @app.post("/api/todos", response_model=Todo, status_code=status.HTTP_201_CREATED)
@@ -68,25 +101,44 @@ def create_todo(payload: TodoCreate):
     row = {
         "id": str(uuid4()),
         "text": text,
-        "completed": False,
+        "completed": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    _todos[row["id"]] = row
+    conn = _get_conn()
+    conn.execute(
+        "INSERT INTO todos (id, text, completed, created_at) VALUES (?, ?, ?, ?)",
+        (row["id"], row["text"], row["completed"], row["created_at"]),
+    )
+    conn.commit()
+    conn.close()
     return _to_todo(row)
 
 
 @app.patch("/api/todos/{todo_id}", response_model=Todo)
 def update_todo(todo_id: str, payload: TodoUpdate):
-    row = _todos.get(todo_id)
-    if row is None:
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE todos SET completed = ? WHERE id = ?",
+        (1 if payload.completed else 0, todo_id),
+    )
+    if cur.rowcount == 0:
+        conn.close()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="todo not found")
-    row["completed"] = payload.completed
+    row = conn.execute(
+        "SELECT id, text, completed, created_at FROM todos WHERE id = ?", (todo_id,)
+    ).fetchone()
+    conn.commit()
+    conn.close()
     return _to_todo(row)
 
 
 @app.delete("/api/todos/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_todo(todo_id: str):
-    if todo_id not in _todos:
+    conn = _get_conn()
+    cur = conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
+    if cur.rowcount == 0:
+        conn.close()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="todo not found")
-    del _todos[todo_id]
+    conn.commit()
+    conn.close()
     return None
