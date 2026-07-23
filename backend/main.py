@@ -1,6 +1,7 @@
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from uuid import uuid4
 
@@ -25,6 +26,13 @@ async def lifespan(app: FastAPI):
         )
         """
     )
+    # Migrate existing DBs: add the category column if it's missing and
+    # backfill pre-existing rows to the default. Idempotent across boots.
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(todos)")}
+    if "category" not in cols:
+        conn.execute(
+            "ALTER TABLE todos ADD COLUMN category TEXT NOT NULL DEFAULT 'General'"
+        )
     conn.commit()
     conn.close()
     yield
@@ -40,6 +48,13 @@ def _get_conn() -> sqlite3.Connection:
     return conn
 
 
+class Category(str, Enum):
+    General = "General"
+    Work = "Work"
+    Personal = "Personal"
+    Shopping = "Shopping"
+
+
 class TodoBase(BaseModel):
     text: str = Field(min_length=1, max_length=255)
 
@@ -47,7 +62,8 @@ class TodoBase(BaseModel):
 
 
 class TodoCreate(TodoBase):
-    pass
+    # Optional; unknown values are rejected with 422 by the Enum.
+    category: Category = Category.General
 
 
 class TodoUpdate(BaseModel):
@@ -61,6 +77,7 @@ class Todo(BaseModel):
     text: str
     completed: bool
     created_at: str
+    category: str
 
 
 def _to_todo(row: sqlite3.Row) -> Todo:
@@ -69,6 +86,7 @@ def _to_todo(row: sqlite3.Row) -> Todo:
         text=row["text"],
         completed=bool(row["completed"]),
         created_at=row["created_at"],
+        category=row["category"],
     )
 
 
@@ -82,7 +100,7 @@ def list_todos():
     # Newest first: sort by created_at descending.
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT id, text, completed, created_at FROM todos ORDER BY created_at DESC"
+        "SELECT id, text, completed, created_at, category FROM todos ORDER BY created_at DESC"
     ).fetchall()
     conn.close()
     return [_to_todo(r) for r in rows]
@@ -103,11 +121,12 @@ def create_todo(payload: TodoCreate):
         "text": text,
         "completed": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "category": payload.category.value,
     }
     conn = _get_conn()
     conn.execute(
-        "INSERT INTO todos (id, text, completed, created_at) VALUES (?, ?, ?, ?)",
-        (row["id"], row["text"], row["completed"], row["created_at"]),
+        "INSERT INTO todos (id, text, completed, created_at, category) VALUES (?, ?, ?, ?, ?)",
+        (row["id"], row["text"], row["completed"], row["created_at"], row["category"]),
     )
     conn.commit()
     conn.close()
@@ -125,7 +144,7 @@ def update_todo(todo_id: str, payload: TodoUpdate):
         conn.close()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="todo not found")
     row = conn.execute(
-        "SELECT id, text, completed, created_at FROM todos WHERE id = ?", (todo_id,)
+        "SELECT id, text, completed, created_at, category FROM todos WHERE id = ?", (todo_id,)
     ).fetchone()
     conn.commit()
     conn.close()

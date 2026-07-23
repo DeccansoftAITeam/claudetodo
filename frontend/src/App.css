@@ -60,6 +60,54 @@
   filter: brightness(1.08);
 }
 
+.add-form__category {
+  flex: 0 0 auto;
+  padding: 0.6rem 0.5rem;
+  font: inherit;
+  color: var(--text-h);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.add-form__category:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+/* --- Category filter pills --- */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.filters__pill {
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+
+.filters__pill:hover {
+  border-color: var(--accent-border);
+}
+
+.filters__pill--active {
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  font-weight: 600;
+}
+
 /* --- Error --- */
 .error {
   margin: 0 0 0.75rem;
@@ -120,6 +168,60 @@
   text-decoration: line-through;
   color: var(--text);
   opacity: 0.7;
+}
+
+/* --- Category badge --- */
+.todo__category {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.todo__category--general {
+  color: #4b5563;
+  background: rgba(107, 114, 128, 0.15);
+}
+
+.todo__category--work {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.todo__category--personal {
+  color: #047857;
+  background: rgba(5, 150, 105, 0.14);
+}
+
+.todo__category--shopping {
+  color: #b45309;
+  background: rgba(217, 119, 6, 0.16);
+}
+
+@media (prefers-color-scheme: dark) {
+  .todo__category--general {
+    color: #cbd5e1;
+    background: rgba(148, 163, 184, 0.2);
+  }
+  .todo__category--work {
+    color: #93c5fd;
+    background: rgba(96, 165, 250, 0.2);
+  }
+  .todo__category--personal {
+    color: #6ee7b7;
+    background: rgba(52, 211, 153, 0.2);
+  }
+  .todo__category--shopping {
+    color: #fcd34d;
+    background: rgba(251, 191, 36, 0.2);
+  }
+}
+
+.todo--done .todo__category {
+  opacity: 0.6;
 }
 
 .todo__delete {

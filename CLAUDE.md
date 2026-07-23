@@ -21,7 +21,8 @@ Each subfolder has its own `CLAUDE.md` with stack-specific commands and conventi
 
 - **API contract:** all todos routes are under `/api` (`GET /api/todos`, `POST /api/todos`, `PATCH /api/todos/{id}`, `DELETE /api/todos/{id}`). `GET /health` is the liveness probe.
 - **Dev wiring:** the Vite dev server (`:5173`) proxies `/api` and `/health` to the FastAPI server (`:8000`) — see `frontend/vite.config.js`. So during development the frontend calls relative paths like `/api/todos` and they reach the backend automatically. **Both servers must be running** for the app to work locally.
-- **Todo shape:** `{ id: string (UUID), text: string, completed: boolean, created_at: ISO8601 string }`. The backend generates `id` and `created_at`; the client sends only `text` (POST) or `completed` (PATCH). Text is 1–255 chars, trimmed.
+- **Todo shape:** `{ id: string (UUID), text: string, completed: boolean, created_at: ISO8601 string, category: string }`. The backend generates `id` and `created_at`; the client sends `text` + optional `category` (POST) or `completed` (PATCH). Text is 1–255 chars, trimmed.
+- **Category:** a fixed enum — `General`, `Work`, `Personal`, `Shopping` — defined once in the backend `Category` enum and mirrored by the frontend `CATEGORIES` constant (keep them in sync). Optional on POST, defaults to `General`; an unknown value is a `422`. Set at creation and not editable (no PATCH support). Filtering by category is **client-side only** — `GET /api/todos` always returns every todo; there is no `?category=` param.
 - **Ordering:** `GET /api/todos` returns newest-first (sorted by `created_at` desc). The frontend also prepends newly created todos, so don't re-sort on the client.
 
 ## Working in this repo
