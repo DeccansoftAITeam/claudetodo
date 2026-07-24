@@ -41,6 +41,8 @@ A single assumed user on a single device. No login. Todos are scoped to one shar
 | F4 | Delete a todo. |
 | F5 | Persist todos across page reloads via the backend. |
 | F6 | Reject empty/whitespace-only todo text with a client-side error. |
+| F7 | Assign each todo a category from a fixed set (`General`, `Work`, `Personal`, `Shopping`), defaulting to `General`. Category is set at creation and not editable. |
+| F8 | Filter the visible list by category in the UI (client-side; `All` shows everything). |
 
 ## 6. Data Model
 
@@ -52,6 +54,7 @@ A single assumed user on a single device. No login. Todos are scoped to one shar
 | `text` | string | 1–255 chars, trimmed. |
 | `completed` | boolean | Defaults to `false`. |
 | `created_at` | ISO 8601 datetime | Server-generated. |
+| `category` | string (enum) | One of `General`, `Work`, `Personal`, `Shopping`. Defaults to `General`. Set at creation, not editable. |
 
 ## 7. API
 
@@ -60,11 +63,11 @@ REST over JSON. Base path: `/api`.
 | Method | Path | Body | Response |
 |--------|------|------|----------|
 | `GET` | `/todos` | — | `200` `Todo[]` |
-| `POST` | `/todos` | `{ text }` | `201` `Todo` |
+| `POST` | `/todos` | `{ text, category? }` | `201` `Todo` |
 | `PATCH` | `/todos/{id}` | `{ completed }` | `200` `Todo` |
 | `DELETE` | `/todos/{id}` | — | `204` |
 
-Validation: `POST` rejects empty/over-length text with `422`. Unknown id returns `404`.
+Validation: `POST` rejects empty/over-length text with `422`. `category` is optional (defaults to `General`) and must be one of the four enum values, else `422`. Unknown id returns `404`. Filtering by category is done client-side; there is no `category` query parameter.
 
 ## 8. Technology
 
