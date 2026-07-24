@@ -16,10 +16,10 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: claudetodo-backend
-          type: web
-          property: host
+        # `fromService: {property: host}` resolves to Render's internal
+        # private-network hostname (just the service name), not the public
+        # onrender.com domain the browser can reach — so it's hardcoded here.
+        value: claudetodo-backend.onrender.com
     routes:
       - type: rewrite
         source: /*
