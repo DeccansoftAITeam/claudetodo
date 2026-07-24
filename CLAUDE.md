@@ -11,6 +11,7 @@ ClaudeTodo — a minimal single-user todo app. React (Vite) frontend talks to a 
 ```
 claudetodo/
 ├── PRD.md            # product spec — source of truth for behavior
+├── render.yaml        # Render Blueprint — deploys backend + frontend as separate services
 ├── backend/          # FastAPI app, single main.py (see backend/CLAUDE.md)
 └── frontend/         # React + Vite app (see frontend/CLAUDE.md)
 ```
@@ -30,3 +31,11 @@ Each subfolder has its own `CLAUDE.md` with stack-specific commands and conventi
 - Keep changes inside the boundary they belong to — backend data/validation logic in `backend/`, UI/state in `frontend/`. The API contract above is the seam; change both sides together if you change it.
 - There is no test suite in v1 and no CI. Verify by running both servers and exercising the create/complete/delete/reload flow against the acceptance criteria in PRD.md §10.
 - `backend/.venv/`, `frontend/node_modules/`, `frontend/dist/`, and `__pycache__/` are build artifacts — never edit or commit them.
+
+## Deployment
+
+Backend and frontend deploy as two separate Render services, defined in `render.yaml` (a Render Blueprint — "New +" → "Blueprint" in the Render dashboard, pointed at this repo).
+
+- **Backend** (`claudetodo-backend`): Python web service, `uvicorn main:app --host 0.0.0.0 --port $PORT`. CORS is wide open (`allow_origins=["*"]`) in `main.py` since there's no auth/cookies to protect — this is what lets the frontend call it from a different Render host.
+- **Frontend** (`claudetodo-frontend`): static site built with `npm run build`. Since it's on a different host than the backend, relative `/api/...` fetches won't reach it — `App.jsx` prefixes requests with `API_BASE`, built from the `VITE_API_URL` env var (empty in dev, so the Vite proxy still works locally). The blueprint wires `VITE_API_URL` to the backend service's hostname automatically via `fromService`.
+- **Free-tier caveat:** Render's free web services have an ephemeral filesystem — `backend/todos.db` gets wiped on every redeploy and likely on spin-down/spin-up after 15 min of inactivity. Fine for a demo; don't rely on it for real data without a paid persistent disk.

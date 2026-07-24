@@ -5,12 +5,17 @@ const MAX_TEXT = 255
 // Mirrors the backend Category enum (source of truth in backend/main.py).
 const CATEGORIES = ['General', 'Work', 'Personal', 'Shopping']
 
+// In dev, empty and the Vite proxy handles relative paths (see vite.config.js).
+// In prod, set to the backend's hostname (no scheme) when frontend and backend
+// are deployed as separate hosts/services — see render.yaml.
+const API_BASE = import.meta.env.VITE_API_URL ? `https://${import.meta.env.VITE_API_URL}` : ''
+
 /**
  * Tiny fetch wrapper for the /api endpoints.
  * Throws an Error with the server's detail message on a non-ok response.
  */
 async function api(path, { method, body } = {}) {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,

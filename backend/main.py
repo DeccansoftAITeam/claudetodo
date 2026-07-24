@@ -6,6 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 DB_PATH = Path(__file__).parent / "todos.db"
@@ -39,6 +40,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ClaudeTodo API", version="1.0", lifespan=lifespan)
+
+# No auth/cookies in v1, so a wildcard origin is safe here and lets the
+# frontend be deployed on a different host/domain than the backend.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def _get_conn() -> sqlite3.Connection:
